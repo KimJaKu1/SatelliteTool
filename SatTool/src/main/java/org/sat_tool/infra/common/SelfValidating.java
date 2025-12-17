@@ -1,5 +1,4 @@
-package csg.csg_back_pro.infra.common;
-
+package org.sat_tool.infra.common;
 
 import jakarta.validation.*;
 import java.util.Set;

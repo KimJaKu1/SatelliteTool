@@ -1,4 +1,4 @@
-package csg.csg_back_pro.infra.config;
+package org.sat_tool.infra.config;
 
 import org.mapstruct.MapperConfig;
 import org.mapstruct.NullValueCheckStrategy;

@@ -1,4 +1,4 @@
-package csg.csg_back_pro.infra.mapper;
+package org.sat_tool.infra.mapper;
 
 import org.mapstruct.Mapper;
 import org.mapstruct.Named;
