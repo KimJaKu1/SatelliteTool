@@ -9,5 +9,4 @@ public class SatToolApplication {
     public static void main(String[] args) {
         SpringApplication.run(SatToolApplication.class, args);
     }
-
 }

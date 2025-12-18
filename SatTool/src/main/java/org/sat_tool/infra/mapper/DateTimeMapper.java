@@ -1,8 +1,5 @@
 package org.sat_tool.infra.mapper;
 
-import org.mapstruct.Mapper;
-import org.mapstruct.Named;
-
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
