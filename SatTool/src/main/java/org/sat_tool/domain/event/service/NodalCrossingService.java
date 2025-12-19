@@ -73,8 +73,8 @@ public class NodalCrossingService {
 
                         nodalCrossings.add(new NodalCrossing(
                                 orbitNumber[0],
-                                increasing ? timeConverter.toCompactUtcString(state.getDate()) : null, // Asc or Desc 시각
-                                increasing ? null : timeConverter.toCompactUtcString(state.getDate()),
+                                increasing ? timeConverter.toUtcAbbrMSec(state.getDate()) : null, // Asc or Desc 시각
+                                increasing ? null : timeConverter.toUtcAbbrMSec(state.getDate()),
                                 null, null));
 
                         return Action.CONTINUE; // ★ 여기서 끝! (채우기 완료)
@@ -88,9 +88,9 @@ public class NodalCrossingService {
 
                     NodalCrossing cur = nodalCrossings.get(nodalCrossings.size() - 1);
                     if (increasing && cur.getAscendingNodeTime() == null)
-                        cur.setAscendingNodeTime(timeConverter.toCompactUtcString(state.getDate()));
+                        cur.setAscendingNodeTime(timeConverter.toUtcAbbrMSec(state.getDate()));
                     if (!increasing && cur.getDescendingNodeTime() == null)
-                        cur.setDescendingNodeTime(timeConverter.toCompactUtcString(state.getDate()));
+                        cur.setDescendingNodeTime(timeConverter.toUtcAbbrMSec(state.getDate()));
                     return Action.CONTINUE;
                 });
 
@@ -108,9 +108,9 @@ public class NodalCrossingService {
 
                     NodalCrossing cur = nodalCrossings.get(nodalCrossings.size() - 1);
                     if (lat > 0 && cur.getMaxLatTime() == null)
-                        cur.setMaxLatTime(timeConverter.toCompactUtcString(state.getDate()));
+                        cur.setMaxLatTime(timeConverter.toUtcAbbrMSec(state.getDate()));
                     if (lat < 0 && cur.getMinLatTime() == null)
-                        cur.setMinLatTime(timeConverter.toCompactUtcString(state.getDate()));
+                        cur.setMinLatTime(timeConverter.toUtcAbbrMSec(state.getDate()));
 
                     return Action.CONTINUE;
                 });
@@ -141,7 +141,7 @@ public class NodalCrossingService {
                 boolean newFile = Files.size(file) == 0;          // 최초 생성 여부
 
                 if (newFile) {
-                    w.write(String.format("%101s%n", timeConverter.UTC_HEADER_DATETIME_ABBR_MONTH.format(ZonedDateTime.now(ZoneOffset.UTC))));
+                    w.write(String.format("%101s%n", TimeConverter.UTC_DT_HDR_ABBR.format(ZonedDateTime.now(ZoneOffset.UTC))));
                     w.write("Satellite-" + satNum);
                     w.newLine(); w.newLine();
                     w.newLine();
