@@ -23,6 +23,7 @@ import org.sat_tool.domain.coordinate.service.CoordinateService;
 import org.sat_tool.domain.coordinate.service.SatPosService;
 import org.sat_tool.domain.coordinate.service.TopocentricService;
 import org.sat_tool.domain.event.model.ContactSchedule;
+import org.sat_tool.domain.event.worker.ContactScheduleWoker;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.scheduling.annotation.Async;
@@ -33,29 +34,20 @@ import org.springframework.stereotype.Service;
 public class ContactScheduleService {
 
     @Autowired
-    private CoordinateService coordinateService;
-    @Autowired
-    private TopocentricService topocentricService;
-    @Autowired
-    private SatPosService satPosService;
+    private ContactScheduleWoker csAsyncWorker;
 
-    @Autowired
-    private TimeConverter timeConverter;
+    public CompletableFuture<Map<String, List<ContactSchedule>>> generateContactSchedule(
+            Satellite satellite, List<Station> stations,
+            AbsoluteDate startDate, AbsoluteDate endDate, double intervalSeconds) {
 
-    public CompletableFuture<Map<String, List<ContactSchedule>>> computeContactSchedule(
-            AbsoluteDate start, AbsoluteDate end,
-            double stepSec, Satellite satellite, List<Station> stations) {
-
-        ConcurrentMap<Station, List<ContactSchedule>> total = new ConcurrentHashMap<>();
-
+        ConcurrentMap<String, List<ContactSchedule>> total = new ConcurrentHashMap<>();
         // ① 위성 단위 비동기 작업
-        CompletableFuture<?>[] tasks = reqs.stream()
-                .map(ev -> csAsyncWorker.asyncSatellite(ev, start, end, stepSec, total)) // asyncSatellite 는
+        CompletableFuture<?>[] tasks = stations.stream()
+                .map(station -> csAsyncWorker.asyncComputeCsByStation(satellite, station, startDate, endDate, intervalSeconds, total)) // asyncSatellite 는
                                                                                          // CompletableFuture<Void> 반환
                 .toArray(CompletableFuture[]::new);
 
         return CompletableFuture.allOf(tasks)
                 .thenApply(v -> new HashMap<>(total));
     }
-
 }

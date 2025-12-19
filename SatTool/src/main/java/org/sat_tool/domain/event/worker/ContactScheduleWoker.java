@@ -31,22 +31,25 @@ import org.springframework.stereotype.Service;
 @DependsOn("orekitInitializer")
 public class ContactScheduleWoker {
 
-    @Autowired private TopocentricService topocentricService;
-    @Autowired private CoordinateService coordinateService;
+    @Autowired
+    private TopocentricService topocentricService;
+    @Autowired
+    private CoordinateService coordinateService;
 
-    @Autowired private TimeConverter timeConverter;
-    @Autowired private SatPosService satPosService;
+    @Autowired
+    private TimeConverter timeConverter;
+    @Autowired
+    private SatPosService satPosService;
 
     @Async
-    public CompletableFuture<Void> asyncSatellite(
-            Satellite satellite, List<Station> stations,
-            AbsoluteDate start, AbsoluteDate end, double step,
-            ConcurrentMap<String, List<ContactSchedule>> total) {
+    public CompletableFuture<Void> asyncComputeCsByStation(Satellite satellite, Station station,
+    AbsoluteDate start, AbsoluteDate end,
+    double step, ConcurrentMap<String,List<ContactSchedule>>total)
+    {
 
         TLEPropagator propagator = TLEPropagator.selectExtrapolator(satellite.getTle());
 
-        for (Station station : stations) {
-            TopocentricFrame stFrame = station.getStationFrame();
+        TopocentricFrame stFrame = station.getStationFrame();
 
             Map<Integer, List<ContactSchedule>> part = calcContactForStation(propagator,
                     station, stFrame, start, end, step, satellite.OrbitNumber);
@@ -57,7 +60,6 @@ public class ContactScheduleWoker {
                         k -> Collections.synchronizedList(new ArrayList<>(list.size())))
                         .addAll(list);
             });
-        }
         return CompletableFuture.completedFuture(null);
     }
 
