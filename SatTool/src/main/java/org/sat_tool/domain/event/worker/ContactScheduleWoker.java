@@ -52,7 +52,7 @@ public class ContactScheduleWoker {
         TopocentricFrame stFrame = station.getStationFrame();
 
             Map<Integer, List<ContactSchedule>> part = calcContactForStation(propagator,
-                    station, stFrame, start, end, step, satellite.OrbitNumber);
+                    station, stFrame, start, end, step, satellite.getOrbitNumber());
             /* merge */
             part.forEach((m, list) -> {
                 String key = satellite.getSatelliteName() + '_' + station.getStationName() + '_' + m;
@@ -65,9 +65,9 @@ public class ContactScheduleWoker {
 
     private Map<Integer, List<ContactSchedule>> calcContactForStation(
             TLEPropagator prop, Station st, TopocentricFrame stFrame,
-            AbsoluteDate start, AbsoluteDate end, double step, Integer orbitNumber) {
+            AbsoluteDate start, AbsoluteDate end, double step, Long orbitNumber) {
 
-        Set<Integer> masks = new HashSet<>(st.angle);
+        Set<Integer> masks = new HashSet<>(st.getAngles());
         Map<Integer, List<ContactSchedule>> out = new HashMap<>();
         masks.forEach(m -> out.put(m, new ArrayList<>(64))); // 초기 용량 예측
 
@@ -88,7 +88,7 @@ public class ContactScheduleWoker {
                     cur.computeIfAbsent(m, k -> {
                         ContactSchedule dto = new ContactSchedule(
                                 calculateInitialOrbitNumber(prop.getTLE(), ts, orbitNumber),
-                                timeConverter.toUtcAbbrMSec(ts), null, el, (double) 0);
+                                ts, null, el, (double) 0);
                         maxEl.put(k, el);
                         return dto;
                     });
@@ -98,8 +98,8 @@ public class ContactScheduleWoker {
                     }
                 } else if (cur.containsKey(m)) { // 가시 종료
                     ContactSchedule dto = cur.remove(m);
-                    dto.setLos(timeConverter.toUtcAbbrMSec(t));
-                    dto.setDuration((int) t.durationFrom(timeConverter.fromCompactUtcString(dto.getAos())));
+                    dto.setLos(t);
+                    dto.setDuration((int) t.durationFrom(dto.getAos()));
                     out.get(m).add(dto);
                     maxEl.remove(m);
                 }
@@ -107,15 +107,15 @@ public class ContactScheduleWoker {
         }
         /* 열린 pass flush */
         cur.forEach((m, dto) -> {
-            dto.setLos(timeConverter.toUtcAbbrMSec(end)); // 끝 시점으로 마감
-            dto.setDuration((int) end.durationFrom(timeConverter.fromCompactUtcString(dto.getAos())));
+            dto.setLos(end); // 끝 시점으로 마감
+            dto.setDuration((int) end.durationFrom(dto.getAos()));
             out.get(m).add(dto);
         });
 
         return out;
     }
 
-    private long calculateInitialOrbitNumber(TLE tle, AbsoluteDate startDate, Integer orbitNum) {
+    private long calculateInitialOrbitNumber(TLE tle, AbsoluteDate startDate, Long orbitNum) {
         AbsoluteDate epochDate = tle.getDate();
 
         double meanMotion = tle.getMeanMotion();

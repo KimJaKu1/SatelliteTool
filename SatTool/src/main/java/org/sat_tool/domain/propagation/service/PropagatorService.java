@@ -11,8 +11,7 @@ import org.springframework.stereotype.Service;
 public class PropagatorService {
 
     // TLE & Propagator
-    public TLEPropagator sgp4Propagator(String line1, String line2) {
-        TLE tle = new TLE(line1, line2);
+    public TLEPropagator sgp4Propagator(TLE tle) {
         return TLEPropagator.selectExtrapolator(tle);
     }
 

@@ -18,7 +18,7 @@ public class Station {
     public float latitude;
     public float longitude;
     public float height;
-    public List<Integer> angle = new ArrayList<>();
+    public List<Integer> angles = new ArrayList<>();
 
     public final OneAxisEllipsoid earth = new OneAxisEllipsoid(
             Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
@@ -28,5 +28,13 @@ public class Station {
     public TopocentricFrame getStationFrame() {
         GeodeticPoint groundStation = new GeodeticPoint(Math.toRadians(this.latitude),Math.toRadians(this.longitude),this.height);
         return new TopocentricFrame(earth, groundStation, this.stationName);
+    }
+
+    public Station(String stationName, double latitude, double longitude, double height, List<Integer> angles) {
+        this.stationName = stationName;
+        this.latitude = (float)latitude;
+        this.longitude = (float)longitude;
+        this.height = (float)height;
+        this.angles = angles;
     }
 }

@@ -7,12 +7,12 @@ import lombok.Data;
 @Data
 public class ContactSchedule {
     private long orbitnumber;
-    private String aos;
-    private String los;
+    private AbsoluteDate aos;
+    private AbsoluteDate los;
     private double maxElevation;
     private double duration;
 
-    public ContactSchedule(long orbitnumber, String aos, String los, double maxElevation, double duration) {
+    public ContactSchedule(long orbitnumber, AbsoluteDate aos, AbsoluteDate los, double maxElevation, double duration) {
         this.orbitnumber = orbitnumber;
         this.aos = aos;
         this.los = los;

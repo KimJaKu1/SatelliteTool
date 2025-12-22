@@ -67,6 +67,11 @@ public final class TimeConverter {
         return UTC_DT_ABBR_MS.format(instant);
     }
 
+    public String toCompactUtcString(AbsoluteDate date) {
+        Instant instant = date.toDate(TimeScalesFactory.getUTC()).toInstant();
+        return UTC_TS_COMPACT_MS.format(instant);
+    }
+
     public AbsoluteDate fromCompactUtcString(String s) {
         Instant instant = Instant.from(UTC_TS_COMPACT_MS.parse(s));
         return new AbsoluteDate(Date.from(instant), TimeScalesFactory.getUTC());

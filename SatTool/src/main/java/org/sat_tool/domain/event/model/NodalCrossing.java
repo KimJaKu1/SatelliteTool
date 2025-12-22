@@ -1,18 +1,22 @@
 package org.sat_tool.domain.event.model;
 
+import java.time.LocalDateTime;
+
+import org.orekit.time.AbsoluteDate;
+
 import lombok.Data;
 
 @Data
 public class NodalCrossing {
 
-    private long orbitNumber;
-    private String ascendingNodeTime;
-    private String descendingNodeTime;
-    private String minLatTime;
-    private String maxLatTime;
+    private Long orbitNumber;
+    private AbsoluteDate ascendingNodeTime;
+    private AbsoluteDate descendingNodeTime;
+    private AbsoluteDate minLatTime;
+    private AbsoluteDate maxLatTime;
 
     // 날짜 형식 지정 (예: "yyyy-MM-dd HH:mm:ss")
-    public NodalCrossing(long orbitNumber, String ascendingNodeTime, String descendingNodeTime, String minLatTime, String maxLatTime) {
+    public NodalCrossing(Long orbitNumber, AbsoluteDate ascendingNodeTime, AbsoluteDate descendingNodeTime, AbsoluteDate minLatTime, AbsoluteDate maxLatTime) {
         this.orbitNumber = orbitNumber;
         this.ascendingNodeTime = ascendingNodeTime;
         this.descendingNodeTime = descendingNodeTime;

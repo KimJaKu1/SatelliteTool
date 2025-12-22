@@ -45,13 +45,11 @@ public class AntennaTrackingWoker {
 
         TLEPropagator prop = TLEPropagator.selectExtrapolator(satellite.getTle());
 
-        Map<String, List<List<AntennaTracking>>> part =
-                computeAntennaTracking(satellite.getSatelliteName(), prop, station, start, end, dt);
+        Map<String, List<List<AntennaTracking>>> part = computeAntennaTracking(satellite.getSatelliteName(), prop,
+                station, start, end, dt);
 
-        part.forEach((k, v) ->
-                total.computeIfAbsent(k, kk -> Collections.synchronizedList(new ArrayList<>()))
-                     .addAll(v)
-        );
+        part.forEach((k, v) -> total.computeIfAbsent(k, kk -> Collections.synchronizedList(new ArrayList<>()))
+                .addAll(v));
 
         return CompletableFuture.completedFuture(null);
     }
@@ -62,7 +60,7 @@ public class AntennaTrackingWoker {
 
         TopocentricFrame frame = station.getStationFrame();
 
-        int[] masks = station.angle.stream()
+        int[] masks = station.getAngles().stream()
                 .sorted()
                 .mapToInt(Integer::intValue)
                 .toArray();
@@ -88,7 +86,7 @@ public class AntennaTrackingWoker {
                     buf[i].add(new AntennaTracking(timeConverter.toUtcAbbrSec(t), (float) az, (float) el));
                 } else if (inPass[i]) { // pass 종료
                     inPass[i] = false;
-                     String key = satName + '_' + station.getStationName() + "_EL_" + m;
+                    String key = satName + '_' + station.getStationName() + "_EL_" + m;
                     out.computeIfAbsent(key, k -> new ArrayList<>()).add(buf[i]);
                     buf[i] = new ArrayList<>();
                 }
