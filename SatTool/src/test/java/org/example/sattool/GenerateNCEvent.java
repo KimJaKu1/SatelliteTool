@@ -14,7 +14,8 @@ import org.sat_tool.domain.common.model.Satellite;
 import org.sat_tool.domain.common.model.Station;
 import org.sat_tool.domain.coordinate.model.EphemerisVector;
 import org.sat_tool.domain.event.antennatracking.service.AntennaTrackingService;
-import org.sat_tool.domain.event.service.ContactScheduleService;
+import org.sat_tool.domain.event.contactschedule.service.ContactScheduleService;
+import org.sat_tool.domain.event.eclipse.service.EclipseSevice;
 import org.sat_tool.domain.event.nodalcrossing.service.NodalCrossingService;
 import org.sat_tool.domain.propagation.service.PropagateService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,8 +33,8 @@ public class GenerateNCEvent {
     private NodalCrossingService ncService;
     @Autowired
     private ContactScheduleService csService;
-//    @Autowired
-//    private EclipseService eclipseService;
+    @Autowired
+    private EclipseSevice eclipseService;
 
     @Autowired
     private TimeConverter timeConverter;
@@ -109,20 +110,25 @@ public class GenerateNCEvent {
     }
 
 
-//    @Test
-//    void eclipseFile() {
-//        Satellite sat = new Satellite();
-//        sat.setSatelliteName("TestSat");
-//        TLE tle = new TLE(line1, line2);
-//        sat.setOrbitNumber((long) tle.getRevolutionNumberAtEpoch());
-//        TLEPropagator propagator = TLEPropagator.selectExtrapolator(tle);
-//
-//        var tmep = eclipseService.computeEclipses(
-//                sat,
-//                timeConverter.localDateTimeUtcToAbsoluteDate(startTime),
-//                timeConverter.localDateTimeUtcToAbsoluteDate(endTime),
-//                60.0);
-//
-//        eclipseService.generateNCFile(tmep, sat.getSatelliteName(), Path.of(path));
-//    }
+    @Test
+    void eclipseFile() {
+        Satellite sat = new Satellite();
+        sat.setSatelliteName("TestSat_20260204");
+        TLE tle = new TLE(line1, line2);
+        sat.setOrbitNumFromTle(tle,timeConverter.localDateTimeUtcToAbsoluteDate(startTime));
+        TLEPropagator propagator = TLEPropagator.selectExtrapolator(tle);
+
+        List<EphemerisVector> ephemerisVectors = propagateService.computeEphemerisECEF(propagator,timeConverter.localDateTimeUtcToAbsoluteDate(startTime),
+                timeConverter.localDateTimeUtcToAbsoluteDate(endTime),
+                1);
+
+
+        var tmep = eclipseService.computeEclipseReportRowsFromEcef_NoPropagator(
+                sat, ephemerisVectors,
+                timeConverter.localDateTimeUtcToAbsoluteDate(startTime),
+                timeConverter.localDateTimeUtcToAbsoluteDate(endTime),
+                1,1e-3, 50);
+
+        eclipseService.generateEclipseFileReport(tmep, sat.getSatelliteName(), Path.of(path));
+    }
 }

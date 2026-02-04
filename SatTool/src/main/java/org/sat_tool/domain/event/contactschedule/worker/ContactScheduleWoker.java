@@ -1,6 +1,5 @@
-package org.sat_tool.domain.event.worker;
+package org.sat_tool.domain.event.contactschedule.worker;
 
-import java.sql.Time;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
@@ -8,7 +7,6 @@ import java.util.concurrent.ConcurrentMap;
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.orekit.frames.TopocentricFrame;
 import org.orekit.propagation.analytical.tle.TLE;
-import org.orekit.propagation.analytical.tle.TLEPropagator;
 import org.orekit.time.AbsoluteDate;
 import org.sat_tool.domain.common.converter.TimeConverter;
 import org.sat_tool.domain.common.helper.HermiteEventUtils;
@@ -18,7 +16,7 @@ import org.sat_tool.domain.coordinate.model.EphemerisVector;
 import org.sat_tool.domain.coordinate.service.CoordinateService;
 import org.sat_tool.domain.coordinate.service.SatPosService;
 import org.sat_tool.domain.coordinate.service.TopocentricService;
-import org.sat_tool.domain.event.model.ContactSchedule;
+import org.sat_tool.domain.event.contactschedule.model.ContactSchedule;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.scheduling.annotation.Async;

@@ -1,4 +1,4 @@
-package org.sat_tool.domain.event.service;
+package org.sat_tool.domain.event.contactschedule.service;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -17,13 +17,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.orekit.time.AbsoluteDate;
 import org.sat_tool.domain.common.converter.TimeConverter;
 import org.sat_tool.domain.common.model.Satellite;
 import org.sat_tool.domain.common.model.Station;
 import org.sat_tool.domain.coordinate.model.EphemerisVector;
-import org.sat_tool.domain.event.model.ContactSchedule;
-import org.sat_tool.domain.event.worker.ContactScheduleWoker;
+import org.sat_tool.domain.event.contactschedule.model.ContactSchedule;
+import org.sat_tool.domain.event.contactschedule.worker.ContactScheduleWoker;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.scheduling.annotation.Async;
