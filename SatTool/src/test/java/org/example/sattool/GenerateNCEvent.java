@@ -71,7 +71,7 @@ public class GenerateNCEvent {
     void generateNCFile() {
 
         Satellite sat = new Satellite();
-        sat.setSatelliteName("TestSat");
+        sat.setSatelliteName("TestSat_20260204");
         TLE tle = new TLE(line1, line2);
         sat.setOrbitNumber((long) tle.getRevolutionNumberAtEpoch());
         TLEPropagator propagator = TLEPropagator.selectExtrapolator(tle);

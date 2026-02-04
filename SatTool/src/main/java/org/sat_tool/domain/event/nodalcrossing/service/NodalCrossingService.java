@@ -45,6 +45,8 @@ public class NodalCrossingService {
 
     @Autowired private TimeConverter timeConverter;
 
+    private final ConcurrentMap<Path, ReentrantLock> fileLock = new ConcurrentHashMap<>();
+
     /** 노드 타입 */
     private enum NodeType { ASC, DESC }
 
@@ -443,5 +445,54 @@ public class NodalCrossingService {
 
     private AbsoluteDate maxDate(AbsoluteDate a, AbsoluteDate b) { return (a.compareTo(b) >= 0) ? a : b; }
     private AbsoluteDate minDate(AbsoluteDate a, AbsoluteDate b) { return (a.compareTo(b) <= 0) ? a : b; }
+
+    public void generateNCFile(List<NodalCrossing> passes, String satName, Path path) {
+        try {
+            Files.createDirectories(path);
+            Path file = path.resolve(satName+"_Nodal_Crossing" + ".dat");
+            if (Files.exists(file)) {          // 이전 결과가 있으면
+                Files.delete(file);            // 먼저 삭제
+            }
+            ReentrantLock lock = fileLock.computeIfAbsent(file, k -> new ReentrantLock());
+            lock.lock();
+            try (BufferedWriter w = Files.newBufferedWriter(
+                    file,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.APPEND,
+                    StandardOpenOption.WRITE))
+            {
+                boolean newFile = Files.size(file) == 0;          // 최초 생성 여부
+
+                if (newFile) {
+                    w.write(String.format("%101s%n", TimeConverter.UTC_DT_HDR_ABBR.format(ZonedDateTime.now(ZoneOffset.UTC))));
+                    w.write("Satellite-" + satName);
+                    w.newLine(); w.newLine();
+                    w.newLine();
+
+                    w.write( "Pass Number    Time of Ascen Node (UTCG)    Time of Descen Node (UTCG)     Time of Min Lat (UTCG)      Time of Max Lat (UTCG) ");
+                    w.newLine();
+                    w.write("-----------    -------------------------    --------------------------    ------------------------    ------------------------");  w.newLine();
+                }
+
+                for (NodalCrossing p : passes)
+                {
+                    String asc  = p.getAscendingNodeTime() == null ? "             Not in Pass"
+                            : timeConverter.toUtcAbbrMSec(p.getAscendingNodeTime());
+                    String desc = p.getDescendingNodeTime() == null ? "             Not in Pass"
+                            : timeConverter.toUtcAbbrMSec(p.getDescendingNodeTime());
+                    String minL = p.getMinLatTime()   == null ? "             Not in Pass"
+                            : timeConverter.toUtcAbbrMSec(p.getMinLatTime());
+                    String maxL = p.getMaxLatTime()   == null ? "             Not in Pass"
+                            : timeConverter.toUtcAbbrMSec(p.getMaxLatTime());
+
+                    w.write(String.format(Locale.US,  "%11d    %-25s    %-26s    %-24s    %-24s%n",
+                            p.getOrbitNumber(), asc, desc, minL, maxL));
+                }
+            }
+
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
 }
 
