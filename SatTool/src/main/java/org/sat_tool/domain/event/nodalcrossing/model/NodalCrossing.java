@@ -1,4 +1,4 @@
-package org.sat_tool.domain.event.model;
+package org.sat_tool.domain.event.nodalcrossing.model;
 
 import java.time.LocalDateTime;
 

@@ -3,13 +3,11 @@ package org.sat_tool.domain.propagation.service;
 import org.orekit.frames.Frame;
 import org.orekit.frames.FramesFactory;
 import org.orekit.propagation.Propagator;
-import org.orekit.propagation.analytical.tle.TLE;
-import org.orekit.propagation.analytical.tle.TLEPropagator;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.utils.IERSConventions;
 import org.orekit.utils.PVCoordinates;
 import org.sat_tool.domain.common.converter.TimeConverter;
-import org.sat_tool.domain.propagation.model.EphemerisVerctor;
+import org.sat_tool.domain.coordinate.model.EphemerisVector;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Service;
@@ -31,25 +29,21 @@ public class PropagateService {
     @Autowired
     private TimeConverter timeConverter;
 
-    public List<EphemerisVerctor> computeOrbitDataWithFrame(Propagator propagator,
-            AbsoluteDate startDate, AbsoluteDate endDate,
-            double intervalSeconds,
-            Frame targetFrame) {
+    public List<EphemerisVector> computeOrbitDataWithFrame(Propagator propagator,
+                                                           AbsoluteDate startDate, AbsoluteDate endDate,
+                                                           double intervalSeconds,
+                                                           Frame targetFrame) {
 
-        List<EphemerisVerctor> result = new ArrayList<>();
+        List<EphemerisVector> result = new ArrayList<>();
 
         for (AbsoluteDate date = startDate; date.compareTo(endDate) <= 0; date = date.shiftedBy(intervalSeconds)) {
             // 원하는 프레임(targetFrame)에서의 PV
             PVCoordinates pv = propagator.getPVCoordinates(date, targetFrame);
 
-            EphemerisVerctor item = new EphemerisVerctor();
-            item.setTime(timeConverter.toCompactUtcString(date));
-            item.setX(pv.getPosition().getX() / 1000.0);
-            item.setY(pv.getPosition().getY() / 1000.0);
-            item.setZ(pv.getPosition().getZ() / 1000.0);
-            item.setVx(pv.getVelocity().getX() / 1000.0);
-            item.setVy(pv.getVelocity().getY() / 1000.0);
-            item.setVz(pv.getVelocity().getZ() / 1000.0);
+            EphemerisVector item = new EphemerisVector();
+            item.setTime(timeConverter.absoluteDateToLocalDateTimeUtc(date));
+            item.setPos(pv.getPosition());
+            item.setVel(pv.getVelocity());
 
             result.add(item);
         }
@@ -57,7 +51,7 @@ public class PropagateService {
         return result;
     }
 
-    public List<EphemerisVerctor> computeEphemerisECI(Propagator propagator, AbsoluteDate startDate,
+    public List<EphemerisVector> computeEphemerisECI(Propagator propagator, AbsoluteDate startDate,
             AbsoluteDate endDate, double intervalSeconds) {
         // ECI(GCRF)
         Frame eciFrame = FramesFactory.getGCRF();
@@ -65,7 +59,7 @@ public class PropagateService {
         return computeOrbitDataWithFrame(propagator, startDate, endDate, intervalSeconds, eciFrame);
     }
 
-    public List<EphemerisVerctor> computeEphemerisECEF(Propagator propagator, AbsoluteDate startDate,
+    public List<EphemerisVector> computeEphemerisECEF(Propagator propagator, AbsoluteDate startDate,
             AbsoluteDate endDate, double intervalSeconds) {
 
         // ECEF(ITRF)
@@ -74,7 +68,7 @@ public class PropagateService {
         return computeOrbitDataWithFrame(propagator, startDate, endDate, intervalSeconds, ecefFrame);
     }
 
-    public List<EphemerisVerctor> computeOrbitData2TOD(Propagator propagator, AbsoluteDate startDate,
+    public List<EphemerisVector> computeOrbitData2TOD(Propagator propagator, AbsoluteDate startDate,
             AbsoluteDate endDate, double intervalSeconds) {
 
         // TOD(True-of-Date, 관성 프레임)
@@ -82,7 +76,7 @@ public class PropagateService {
         return computeOrbitDataWithFrame(propagator, startDate, endDate, intervalSeconds, todFrame);
     }
 
-    public List<EphemerisVerctor> computeOrbitData2TEME(Propagator propagator, AbsoluteDate startDate,
+    public List<EphemerisVector> computeOrbitData2TEME(Propagator propagator, AbsoluteDate startDate,
             AbsoluteDate endDate, double intervalSeconds) {
         Frame temeFrame = FramesFactory.getTEME();
         return computeOrbitDataWithFrame(propagator, startDate, endDate, intervalSeconds, temeFrame);
@@ -93,24 +87,24 @@ public class PropagateService {
         return BigDecimal.valueOf(v).toPlainString();
     }
 
-    public void writeFile(List<EphemerisVerctor> ephemerisVector, Path parnet) {
+    public void writeFile(List<EphemerisVector> ephemerisVector, Path parnet) {
         try (BufferedWriter w = Files.newBufferedWriter(
                 parnet, StandardCharsets.UTF_8,
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
             for (var t : ephemerisVector) {
-                w.write(t.getTime());
+                w.write(timeConverter.localDateTimeToString(t.getTime()));
                 w.write('\t');
-                w.write(toPlain(t.getX()));
+                w.write(toPlain(t.getPos().getX()));
                 w.write('\t');
-                w.write(toPlain(t.getY()));
+                w.write(toPlain(t.getPos().getY()));
                 w.write('\t');
-                w.write(toPlain(t.getZ()));
+                w.write(toPlain(t.getPos().getZ()));
                 w.write('\t');
-                w.write(toPlain(t.getVx()));
+                w.write(toPlain(t.getVel().getX()));
                 w.write('\t');
-                w.write(toPlain(t.getVy()));
+                w.write(toPlain(t.getVel().getY()));
                 w.write('\t');
-                w.write(toPlain(t.getVz()));
+                w.write(toPlain(t.getVel().getZ()));
                 w.newLine();
             }
         } catch (IOException e) {

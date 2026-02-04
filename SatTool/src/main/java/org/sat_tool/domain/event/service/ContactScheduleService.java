@@ -21,6 +21,7 @@ import org.orekit.time.AbsoluteDate;
 import org.sat_tool.domain.common.converter.TimeConverter;
 import org.sat_tool.domain.common.model.Satellite;
 import org.sat_tool.domain.common.model.Station;
+import org.sat_tool.domain.coordinate.model.EphemerisVector;
 import org.sat_tool.domain.event.model.ContactSchedule;
 import org.sat_tool.domain.event.worker.ContactScheduleWoker;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,13 +40,26 @@ public class ContactScheduleService {
 
     public CompletableFuture<Map<String, List<ContactSchedule>>> generateContactSchedule(
             Satellite satellite, List<Station> stations,
-            AbsoluteDate startDate, AbsoluteDate endDate, double intervalSeconds) {
+            List<EphemerisVector> ephemerisVector) {
 
         ConcurrentMap<String, List<ContactSchedule>> total = new ConcurrentHashMap<>();
         // ① 위성 단위 비동기 작업
         CompletableFuture<?>[] tasks = stations.stream()
-                .map(station -> csAsyncWorker.asyncComputeCsByStation(satellite, station, startDate, endDate,
-                        intervalSeconds, total)) // asyncSatellite 는
+                .map(station -> csAsyncWorker.asyncComputeCsByStation(satellite, station, ephemerisVector, total)) // asyncSatellite 는
+                // CompletableFuture<Void> 반환
+                .toArray(CompletableFuture[]::new);
+
+        return CompletableFuture.allOf(tasks)
+                .thenApply(v -> new HashMap<>(total));
+    }
+
+    public CompletableFuture<Map<String, List<ContactSchedule>>> generateContactScheduleTemp(
+            Satellite satellite, List<Station> stations, List<EphemerisVector> ephemerisEcef) {
+
+        ConcurrentMap<String, List<ContactSchedule>> total = new ConcurrentHashMap<>();
+        // ① 위성 단위 비동기 작업
+        CompletableFuture<?>[] tasks = stations.stream()
+                .map(station -> csAsyncWorker.asyncComputeCsByStation(satellite, station, ephemerisEcef, total)) // asyncSatellite 는
                 // CompletableFuture<Void> 반환
                 .toArray(CompletableFuture[]::new);
 
@@ -117,6 +131,5 @@ public class ContactScheduleService {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-
     }
 }

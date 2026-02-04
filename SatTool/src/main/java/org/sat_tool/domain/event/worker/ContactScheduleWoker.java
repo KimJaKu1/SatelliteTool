@@ -1,23 +1,20 @@
 package org.sat_tool.domain.event.worker;
 
 import java.sql.Time;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
 
+import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.orekit.frames.TopocentricFrame;
 import org.orekit.propagation.analytical.tle.TLE;
 import org.orekit.propagation.analytical.tle.TLEPropagator;
 import org.orekit.time.AbsoluteDate;
 import org.sat_tool.domain.common.converter.TimeConverter;
+import org.sat_tool.domain.common.helper.HermiteEventUtils;
 import org.sat_tool.domain.common.model.Satellite;
 import org.sat_tool.domain.common.model.Station;
+import org.sat_tool.domain.coordinate.model.EphemerisVector;
 import org.sat_tool.domain.coordinate.service.CoordinateService;
 import org.sat_tool.domain.coordinate.service.SatPosService;
 import org.sat_tool.domain.coordinate.service.TopocentricService;
@@ -43,74 +40,137 @@ public class ContactScheduleWoker {
 
     @Async
     public CompletableFuture<Void> asyncComputeCsByStation(Satellite satellite, Station station,
-    AbsoluteDate start, AbsoluteDate end,
-    double step, ConcurrentMap<String,List<ContactSchedule>>total)
+                                                           List<EphemerisVector> ecefVectors,
+                                                           ConcurrentMap<String, List<ContactSchedule>> total)
     {
-
-        TLEPropagator propagator = TLEPropagator.selectExtrapolator(satellite.getTle());
-
         TopocentricFrame stFrame = station.getStationFrame();
 
-            Map<Integer, List<ContactSchedule>> part = calcContactForStation(propagator,
-                    station, stFrame, start, end, step, satellite.getOrbitNumber());
-            /* merge */
-            part.forEach((m, list) -> {
-                String key = satellite.getSatelliteName() + '_' + station.getStationName() + '_' + m;
-                total.computeIfAbsent(key,
-                        k -> Collections.synchronizedList(new ArrayList<>(list.size())))
-                        .addAll(list);
-            });
+        List<ContactSchedule> passes =
+                calcContactHorizonFromEcefVectors(satellite, stFrame, ecefVectors);
+
+        // 기존 파일 키/파서 유지 목적이면 마지막에 "_0" 고정
+        String key = satellite.getSatelliteName() + "_" + station.getStationName() + "_0";
+
+        total.computeIfAbsent(key, k -> Collections.synchronizedList(new ArrayList<>(passes.size())))
+                .addAll(passes);
+
         return CompletableFuture.completedFuture(null);
     }
 
-    private Map<Integer, List<ContactSchedule>> calcContactForStation(
-            TLEPropagator prop, Station st, TopocentricFrame stFrame,
-            AbsoluteDate start, AbsoluteDate end, double step, Long orbitNumber) {
+    private List<ContactSchedule> calcContactHorizonFromEcefVectors(
+            Satellite sat,
+            TopocentricFrame stFrame,
+            List<EphemerisVector> ecefVectors
+    ) {
+        if (ecefVectors == null || ecefVectors.size() < 2) return List.of();
 
-        Set<Integer> masks = new HashSet<>(st.getAngles());
-        Map<Integer, List<ContactSchedule>> out = new HashMap<>();
-        masks.forEach(m -> out.put(m, new ArrayList<>(64))); // 초기 용량 예측
+        // elevation 함수: pos는 ECEF(ITRF)로 들어와야 station frame과 일관됨
+        HermiteEventUtils.ScalarFunction elevFn =
+                (tAbs, posEcef, velEcef) -> topocentricService.getElevation(posEcef, stFrame, tAbs);
 
-        Map<Integer, ContactSchedule> cur = new HashMap<>();
-        Map<Integer, Double> maxEl = new HashMap<>();
+        // pass 번호(또는 orbitNumber 필드) 시작값
+        long passNo = (sat.getOrbitNumber() != null) ? sat.getOrbitNumber() : 0L;
 
-        for (AbsoluteDate t = start; t.compareTo(end) <= 0; t = t.shiftedBy(step)) {
+        List<ContactSchedule> out = new ArrayList<>(64);
 
-            final AbsoluteDate ts = t; // ❗ 람다용 복사본
+        ContactSchedule curPass = null;
+        double maxEl = Double.NEGATIVE_INFINITY;
 
-            double el = topocentricService.getElevation(
-                    coordinateService.toECEF(
-                            t, satPosService.getSatECI(prop, t)).getPosition(),
-                    stFrame, t);
+        EphemerisVector prev = ecefVectors.get(0);
+        AbsoluteDate tPrev = timeConverter.localDateTimeUtcToAbsoluteDate(prev.getTime());
+        Vector3D rPrev = prev.getPos();
+        Vector3D vPrev = prev.getVel();
+        double elPrev = topocentricService.getElevation(rPrev, stFrame, tPrev);
 
-            for (int m : masks) {
-                if (el > m) { // 가시
-                    cur.computeIfAbsent(m, k -> {
-                        ContactSchedule dto = new ContactSchedule(
-                                calculateInitialOrbitNumber(prop.getTLE(), ts, orbitNumber),
-                                ts, null, el, (double) 0);
-                        maxEl.put(k, el);
-                        return dto;
-                    });
-                    if (el > maxEl.get(m)) {
-                        maxEl.put(m, el);
-                        cur.get(m).setMaxElevation(el);
-                    }
-                } else if (cur.containsKey(m)) { // 가시 종료
-                    ContactSchedule dto = cur.remove(m);
-                    dto.setLos(t);
-                    dto.setDuration((int) t.durationFrom(dto.getAos()));
-                    out.get(m).add(dto);
-                    maxEl.remove(m);
+        for (int i = 1; i < ecefVectors.size(); i++) {
+            EphemerisVector cur = ecefVectors.get(i);
+
+            AbsoluteDate tCur = timeConverter.localDateTimeUtcToAbsoluteDate(cur.getTime());
+            Vector3D rCur = cur.getPos();
+            Vector3D vCur = cur.getVel();
+
+            double dt = tCur.durationFrom(tPrev);
+            if (dt <= 0) {
+                // 이상 데이터(동일/역전 시간) 스킵
+                tPrev = tCur; rPrev = rCur; vPrev = vCur;
+                elPrev = topocentricService.getElevation(rPrev, stFrame, tPrev);
+                continue;
+            }
+
+            double elCur = topocentricService.getElevation(rCur, stFrame, tCur);
+
+            // ------------------------
+            // AOS: el crosses 0 upward
+            // ------------------------
+            if (curPass == null && elPrev <= 0.0 && elCur > 0.0) {
+                AbsoluteDate aos = HermiteEventUtils.refineRootTimeHermiteBisection(
+                        tPrev, rPrev, vPrev,
+                        tCur,  rCur,  vCur,
+                        elevFn,
+                        0.0,     // target elevation = 0
+                        1e-3,    // tolSeconds
+                        60       // maxIter
+                );
+
+                // AOS는 정확히 el=0인 시각
+                curPass = new ContactSchedule(
+                        passNo,
+                        aos,
+                        null,
+                        0.0,   // maxEl 초기값
+                        0.0
+                );
+                maxEl = 0.0;
+            }
+
+            // pass 내부 max elevation (샘플 기반)
+            if (curPass != null) {
+                if (elCur > maxEl) {
+                    maxEl = elCur;
                 }
             }
+
+            // ------------------------
+            // LOS: el crosses 0 downward
+            // ------------------------
+            if (curPass != null && elPrev > 0.0 && elCur <= 0.0) {
+                AbsoluteDate los = HermiteEventUtils.refineRootTimeHermiteBisection(
+                        tPrev, rPrev, vPrev,
+                        tCur,  rCur,  vCur,
+                        elevFn,
+                        0.0,
+                        1e-3,
+                        60
+                );
+
+                curPass.setLos(los);
+                curPass.setDuration((int) los.durationFrom(curPass.getAos()));
+                curPass.setMaxElevation(maxEl);
+
+                out.add(curPass);
+
+                // 다음 패스로
+                curPass = null;
+                maxEl = Double.NEGATIVE_INFINITY;
+                passNo++;
+            }
+
+            // 다음 구간
+            tPrev = tCur;
+            rPrev = rCur;
+            vPrev = vCur;
+            elPrev = elCur;
         }
-        /* 열린 pass flush */
-        cur.forEach((m, dto) -> {
-            dto.setLos(end); // 끝 시점으로 마감
-            dto.setDuration((int) end.durationFrom(dto.getAos()));
-            out.get(m).add(dto);
-        });
+
+        // 열린 pass flush (끝까지 el>0)
+        if (curPass != null) {
+            // 마지막 벡터 시각을 LOS로 마감(데이터 범위 밖의 LOS는 알 수 없음)
+            AbsoluteDate end = timeConverter.localDateTimeUtcToAbsoluteDate(ecefVectors.get(ecefVectors.size() - 1).getTime());
+            curPass.setLos(end);
+            curPass.setDuration((int) end.durationFrom(curPass.getAos()));
+            curPass.setMaxElevation(maxEl);
+            out.add(curPass);
+        }
 
         return out;
     }

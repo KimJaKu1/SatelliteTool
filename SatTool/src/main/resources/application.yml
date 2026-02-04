@@ -9,8 +9,6 @@ spring:
     name : SatTool
   autoconfigure:
     exclude:
-      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
-      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
   output:
     ansi:
       enabled: ALWAYS
