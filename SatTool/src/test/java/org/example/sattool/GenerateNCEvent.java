@@ -73,20 +73,18 @@ public class GenerateNCEvent {
         Satellite sat = new Satellite();
         sat.setSatelliteName("TestSat_20260204");
         TLE tle = new TLE(line1, line2);
-        sat.setOrbitNumber((long) tle.getRevolutionNumberAtEpoch());
+        sat.setOrbitNumFromTle(tle,timeConverter.localDateTimeUtcToAbsoluteDate(startTime));
         TLEPropagator propagator = TLEPropagator.selectExtrapolator(tle);
 
         List<EphemerisVector> ephemerisVectors = propagateService.computeEphemerisECEF(propagator,timeConverter.localDateTimeUtcToAbsoluteDate(startTime),
                 timeConverter.localDateTimeUtcToAbsoluteDate(endTime),
-                60.0);
+                1);
 
         var nc = ncService.computeNodalCrossingsFromEcef_NoPropagator(sat, ephemerisVectors, timeConverter.localDateTimeUtcToAbsoluteDate(startTime),
                 timeConverter.localDateTimeUtcToAbsoluteDate(endTime), 1,1e-3, 50
                 );
         ncService.generateNCFile(
                 nc, sat.getSatelliteName(), Path.of(path));
-
-//        var temp  = 1;
     }
 
     @Test
