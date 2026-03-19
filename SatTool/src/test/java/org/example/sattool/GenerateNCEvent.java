@@ -52,14 +52,14 @@ public class GenerateNCEvent {
     void generateATFile() {
 
         Satellite sat = new Satellite();
-        sat.setSatelliteName("TestSat");
+        sat.setSatelliteName("TestSat_20260204");
         TLE tle = new TLE(line1, line2);
         sat.setOrbitNumber((long) tle.getRevolutionNumberAtEpoch());
         TLEPropagator propagator = TLEPropagator.selectExtrapolator(tle);
 
         List<EphemerisVector> ephemerisVectors = propagateService.computeEphemerisECEF(propagator,timeConverter.localDateTimeUtcToAbsoluteDate(startTime),
                 timeConverter.localDateTimeUtcToAbsoluteDate(endTime),
-                60.0);
+                60);
 
         List<Station> stations = new ArrayList<>();
         stations.add(new Station("TestStn", 36.8663, 127.1530, 100.0, List.of(0)));
@@ -91,7 +91,7 @@ public class GenerateNCEvent {
     @Test
     void generateCSFile() {
         Satellite sat = new Satellite();
-        sat.setSatelliteName("TestSat");
+        sat.setSatelliteName("TestSat_20260204");
         TLE tle = new TLE(line1, line2);
         sat.setOrbitNumber((long) tle.getRevolutionNumberAtEpoch());
         TLEPropagator propagator = TLEPropagator.selectExtrapolator(tle);

@@ -15,16 +15,27 @@ import org.sat_tool.domain.coordinate.model.EphemerisVector;
 import org.sat_tool.domain.coordinate.service.TopocentricService;
 import org.sat_tool.domain.event.antennatracking.model.AntennaTracking;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
+@DependsOn("orekitInitializer")
 @Component
 public class AntennaTrackingWoker {
+
     @Autowired private TopocentricService topocentricService;
     @Autowired private TimeConverter timeConverter;
 
-    /** 위성 ECEF(ITRF) ephemeris를 EphemerisVector로 1회 생성(공유용) */
-        @Async
+    // =========================
+    // ✅ 방법 2: 저장 시점 스냅(3자리 출력 기준)
+    // =========================
+    private static final double PRINT_3DP_EPS_DEG = 5e-4; // 0.0005 deg
+
+    private static float snapNegZero(float x) {
+        return (Math.abs(x) < PRINT_3DP_EPS_DEG) ? 0.0f : x;
+    }
+
+    @Async
     public CompletableFuture<Void> asyncComputeAtByStation(
             String satName,
             Station station,
@@ -62,24 +73,28 @@ public class AntennaTrackingWoker {
 
         Map<String, List<List<AntennaTracking>>> out = new HashMap<>();
 
-        // Elevation 스칼라 함수 (단위 주의: 아래 코드는 "deg 반환"을 가정)
+        // Elevation 스칼라 함수 (deg 반환 가정)
         HermiteEventUtils.ScalarFunction elevFnDeg =
                 (t, pos, vel) -> topocentricService.getElevation(pos, frame, t);
 
         EphemerisVector prev = null;
 
         for (EphemerisVector cur : ecefVectors) {
+
             if (prev == null) {
-                // 첫 샘플: 시작부터 마스크 위에 있으면 pass를 열고 첫 점을 기록(경계는 이전 샘플이 없으니 정밀 계산 불가)
                 AbsoluteDate t = timeConverter.localDateTimeUtcToAbsoluteDate(cur.getTime());
                 double az = topocentricService.getAzimuth(cur.getPos(), frame, t);
                 double el = topocentricService.getElevation(cur.getPos(), frame, t);
+
+                // ✅ 스냅
+                float azOut = snapNegZero((float) az);
+                float elOut = snapNegZero((float) el);
 
                 for (int mi = 0; mi < mCnt; mi++) {
                     double thr = masks[mi];
                     if (el > thr) {
                         inPass[mi] = true;
-                        buf[mi].add(new AntennaTracking(timeConverter.toUtcAbbrMSec(t), (float) az, (float) el));
+                        buf[mi].add(new AntennaTracking(timeConverter.toUtcAbbrMSec(t), azOut, elOut));
                     }
                 }
 
@@ -104,8 +119,6 @@ public class AntennaTrackingWoker {
 
             double el0 = topocentricService.getElevation(r0, frame, t0);
             double el1 = topocentricService.getElevation(r1, frame, t1);
-
-            // cur 샘플 값(필요시 pass 내부에 그대로 기록)
             double az1 = topocentricService.getAzimuth(r1, frame, t1);
 
             for (int mi = 0; mi < mCnt; mi++) {
@@ -126,13 +139,16 @@ public class AntennaTrackingWoker {
                     buf[mi].add(buildTrackingAtBoundary(t0, r0, v0, t1, r1, v1, tEnter, frame));
 
                     inPass[mi] = true;
-                    // 이후 아래 "pass 내부 샘플 추가" 로직에서 cur(t1) 샘플이 추가됨
+                    // 이후 pass 내부 처리에서 cur 샘플이 추가됨
                 }
 
                 // ---- 2) pass 내부: inPass && el1 > thr  ----
                 if (inPass[mi] && el1 > thr) {
-                    // 간격 유지: cur 시각(t1)을 그대로 기록
-                    buf[mi].add(new AntennaTracking(timeConverter.toUtcAbbrMSec(t1), (float) az1, (float) el1));
+                    // ✅ 스냅
+                    float azOut = snapNegZero((float) az1);
+                    float elOut = snapNegZero((float) el1);
+
+                    buf[mi].add(new AntennaTracking(timeConverter.toUtcAbbrMSec(t1), azOut, elOut));
                     continue;
                 }
 
@@ -194,7 +210,10 @@ public class AntennaTrackingWoker {
         double az = topocentricService.getAzimuth(pv.pos(), frame, tBoundary);
         double el = topocentricService.getElevation(pv.pos(), frame, tBoundary);
 
-        // ms까지 출력(경계시각 정밀도가 보이도록)
-        return new AntennaTracking(timeConverter.toUtcAbbrMSec(tBoundary), (float) az, (float) el);
+        // ✅ 스냅(여기가 -0.000 방지의 핵심)
+        float azOut = snapNegZero((float) az);
+        float elOut = snapNegZero((float) el);
+
+        return new AntennaTracking(timeConverter.toUtcAbbrMSec(tBoundary), azOut, elOut);
     }
 }

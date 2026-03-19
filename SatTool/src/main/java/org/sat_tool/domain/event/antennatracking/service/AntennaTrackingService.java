@@ -33,10 +33,12 @@ import org.springframework.stereotype.Service;
 @Service
 public class AntennaTrackingService {
 
-    @Autowired
-    private AntennaTrackingWoker atWorker;
+    private final AntennaTrackingWoker atWorker;
 
-    // 파일 단위 락
+    public AntennaTrackingService(AntennaTrackingWoker atWorker) {
+        this.atWorker = atWorker;
+    }
+
     private static final ConcurrentMap<Path, ReentrantLock> FILE_LOCK = new ConcurrentHashMap<>();
 
     private static final DateTimeFormatter HDR_FMT =
@@ -44,7 +46,6 @@ public class AntennaTrackingService {
 
     public CompletableFuture<Map<String, List<List<AntennaTracking>>>> generateAntennaTracking(
             Satellite satellite, List<Station> stations, List<EphemerisVector> ecefVectors) {
-
 
         ConcurrentMap<String, List<List<AntennaTracking>>> totalAt = new ConcurrentHashMap<>();
 
@@ -62,28 +63,32 @@ public class AntennaTrackingService {
                 });
     }
 
+    /**
+     * ✅ 중요:
+     * - @Async라서 호출 측은 반드시 join()/get()으로 대기해야 "파일 생성이 보장"됨.
+     * - 내부에서 예외가 발생하면 Future를 exceptional로 종료시켜 호출 측에서 바로 알 수 있게 함.
+     */
     @Async
     public CompletableFuture<Void> generateATFile(
             Set<Map.Entry<String, List<List<AntennaTracking>>>> entries,
             Path baseDir) {
+        try {
+            for (Map.Entry<String, List<List<AntennaTracking>>> e : entries) {
+                KeyParts kp = parseKey(e.getKey());
+                if (kp == null) continue;
 
-        for (Map.Entry<String, List<List<AntennaTracking>>> e : entries) {
-            KeyParts kp = parseKey(e.getKey());
-            if (kp == null) continue;
-
-            writeAT(e.getValue(), kp.sat(), kp.stn(), kp.mask(), baseDir);
+                writeAT(e.getValue(), kp.sat(), kp.stn(), kp.mask(), baseDir);
+            }
+            return CompletableFuture.completedFuture(null);
+        } catch (Exception ex) {
+            CompletableFuture<Void> f = new CompletableFuture<>();
+            f.completeExceptionally(ex);
+            return f;
         }
-        return CompletableFuture.completedFuture(null);
     }
 
     private record KeyParts(String sat, String stn, int mask) {}
 
-    /**
-     * key 형식: sat_stn_mask
-     * - sat = 첫 '_' 전
-     * - mask = 마지막 '_' 뒤
-     * - stn = 그 사이(underscore 포함 가능)
-     */
     private KeyParts parseKey(String rawKey) {
         if (rawKey == null) return null;
 
@@ -106,63 +111,52 @@ public class AntennaTrackingService {
 
     void writeAT(List<List<AntennaTracking>> passes,
                  String sat, String stn, int mask,
-                 Path baseDir) {
+                 Path baseDir) throws IOException {
 
+        Files.createDirectories(baseDir);
+
+        Path file = baseDir.resolve(sat + "_" + stn + "_" + mask + ".txt");
+
+        ReentrantLock lock = FILE_LOCK.computeIfAbsent(file, k -> new ReentrantLock());
+        lock.lock();
         try {
-            Files.createDirectories(baseDir);
-
-            Path file = baseDir.resolve(sat + "_" + stn + "_" + mask + ".txt");
-
-            // 파일 단위 락 (삭제/생성/쓰기까지 한 번에 보호)
-            ReentrantLock lock = FILE_LOCK.computeIfAbsent(file, k -> new ReentrantLock());
-            lock.lock();
-            try {
-                // 매번 새로 생성(기존 있으면 삭제)
-                if (Files.exists(file)) {
-                    Files.delete(file);
-                }
-
-                try (BufferedWriter w = Files.newBufferedWriter(
-                        file, StandardCharsets.UTF_8,
-                        StandardOpenOption.CREATE,
-                        StandardOpenOption.WRITE)) {
-
-                    // 헤더
-                    w.write(String.format("%57s%n", HDR_FMT.format(ZonedDateTime.now(ZoneOffset.UTC))));
-                    w.write("Facility-" + stn + "_EL_" + mask +
-                            "_Deg-To-Satellite-" + sat +
-                            ":  Antenna Tracking Table for CSG");
-                    w.newLine();
-                    w.newLine();
-                    w.newLine();
-
-                    // Pass 별 데이터
-                    for (List<AntennaTracking> pass : passes) {
-                        w.write(String.format("%-24s    %-13s    %-15s%n",
-                                "Time (UTCG)", "Azimuth (deg)", "Elevation (deg)"));
-                        w.write("------------------------    -------------    ---------------");
-                        w.newLine();
-
-                        for (AntennaTracking dto : pass) {
-                            w.write(String.format(Locale.US,
-                                    "%-24s    %13.3f    %15.3f%n",
-                                    dto.getTime(),
-                                    dto.getAzimuth(),
-                                    dto.getElevation()));
-                        }
-                        w.newLine(); // Pass 간 공백
-                    }
-
-                    w.flush();
-                }
-            } finally {
-                lock.unlock();
-                // 필요하면 메모리 누수 방지용으로 cleanup 가능(선택)
-                // FILE_LOCK.remove(file, lock);
+            if (Files.exists(file)) {
+                Files.delete(file);
             }
 
-        } catch (IOException ex) {
-            ex.printStackTrace();
+            try (BufferedWriter w = Files.newBufferedWriter(
+                    file, StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.WRITE)) {
+
+                w.write(String.format("%57s%n", HDR_FMT.format(ZonedDateTime.now(ZoneOffset.UTC))));
+                w.write("Facility-" + stn + "_EL_" + mask +
+                        "_Deg-To-Satellite-" + sat +
+                        ":  Antenna Tracking Table for CSG");
+                w.newLine();
+                w.newLine();
+                w.newLine();
+
+                for (List<AntennaTracking> pass : passes) {
+                    w.write(String.format("%-24s    %-13s    %-15s%n",
+                            "Time (UTCG)", "Azimuth (deg)", "Elevation (deg)"));
+                    w.write("------------------------    -------------    ---------------");
+                    w.newLine();
+
+                    for (AntennaTracking dto : pass) {
+                        w.write(String.format(Locale.US,
+                                "%-24s    %13.3f    %15.3f%n",
+                                dto.getTime(),
+                                dto.getAzimuth(),
+                                dto.getElevation()));
+                    }
+                    w.newLine();
+                }
+
+                w.flush();
+            }
+        } finally {
+            lock.unlock();
         }
     }
 }
