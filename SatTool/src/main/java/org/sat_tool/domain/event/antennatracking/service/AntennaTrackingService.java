@@ -40,6 +40,7 @@ public class AntennaTrackingService {
     }
 
     private static final ConcurrentMap<Path, ReentrantLock> FILE_LOCK = new ConcurrentHashMap<>();
+    private static final String KEY_SEP = "|";
 
     private static final DateTimeFormatter HDR_FMT =
             DateTimeFormatter.ofPattern("dd MMM uuuu HH:mm:ss", Locale.US);
@@ -92,14 +93,14 @@ public class AntennaTrackingService {
     private KeyParts parseKey(String rawKey) {
         if (rawKey == null) return null;
 
-        int firstIdx = rawKey.indexOf('_');
-        int lastIdx = rawKey.lastIndexOf('_');
+        int firstIdx = rawKey.indexOf(KEY_SEP);
+        int lastIdx = rawKey.lastIndexOf(KEY_SEP);
 
         if (firstIdx < 0 || lastIdx <= firstIdx) return null;
 
         String sat = rawKey.substring(0, firstIdx);
-        String stn = rawKey.substring(firstIdx + 1, lastIdx);
-        String maskStr = rawKey.substring(lastIdx + 1);
+        String stn = rawKey.substring(firstIdx + KEY_SEP.length(), lastIdx);
+        String maskStr = rawKey.substring(lastIdx + KEY_SEP.length());
 
         try {
             int mask = Integer.parseInt(maskStr);

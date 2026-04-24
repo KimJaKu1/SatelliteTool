@@ -1,26 +1,25 @@
 package org.sat_tool.domain.event.contactschedule.worker;
 
-import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentMap;
-
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.orekit.frames.TopocentricFrame;
-import org.orekit.propagation.analytical.tle.TLE;
 import org.orekit.time.AbsoluteDate;
 import org.sat_tool.domain.common.converter.TimeConverter;
 import org.sat_tool.domain.common.helper.HermiteEventUtils;
 import org.sat_tool.domain.common.model.Satellite;
 import org.sat_tool.domain.common.model.Station;
 import org.sat_tool.domain.coordinate.model.EphemerisVector;
-import org.sat_tool.domain.coordinate.service.CoordinateService;
-import org.sat_tool.domain.coordinate.service.SatPosService;
 import org.sat_tool.domain.coordinate.service.TopocentricService;
 import org.sat_tool.domain.event.contactschedule.model.ContactSchedule;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentMap;
 
 @Service
 @DependsOn("orekitInitializer")
@@ -29,7 +28,6 @@ public class ContactScheduleWoker {
     private final TopocentricService topocentricService;
     private final TimeConverter timeConverter;
 
-    // ✅ ContactScheduleService와 동일 구분자
     private static final String KEY_SEP = "|";
 
     public ContactScheduleWoker(TopocentricService topocentricService, TimeConverter timeConverter) {
@@ -45,27 +43,41 @@ public class ContactScheduleWoker {
 
         TopocentricFrame stFrame = station.getStationFrame();
 
-        List<ContactSchedule> passes =
-                calcContactHorizonFromEcefVectors(satellite, stFrame, ecefVectors);
+        for (int mask : masksFor(station)) {
+            List<ContactSchedule> passes =
+                    calcContactScheduleFromEcefVectors(satellite, stFrame, ecefVectors, mask);
 
-        // ✅ 안전한 key: sat|stn|mask
-        int mask = 0; // 현재 로직은 horizon(0deg) 기준이므로 0
-        String key = satellite.getSatelliteName() + KEY_SEP + station.getStationName() + KEY_SEP + mask;
+            if (passes.isEmpty()) {
+                continue;
+            }
 
-        total.computeIfAbsent(key, k -> Collections.synchronizedList(new ArrayList<>(passes.size())))
-                .addAll(passes);
+            String key = satellite.getSatelliteName() + KEY_SEP + station.getStationName() + KEY_SEP + mask;
+            total.computeIfAbsent(key, k -> Collections.synchronizedList(new ArrayList<>(passes.size())))
+                    .addAll(passes);
+        }
 
         return CompletableFuture.completedFuture(null);
     }
 
-    private List<ContactSchedule> calcContactHorizonFromEcefVectors(
+    private List<Integer> masksFor(Station station) {
+        if (station.getAngles() == null || station.getAngles().isEmpty()) {
+            return List.of(0);
+        }
+
+        return station.getAngles().stream()
+                .distinct()
+                .sorted()
+                .toList();
+    }
+
+    private List<ContactSchedule> calcContactScheduleFromEcefVectors(
             Satellite sat,
             TopocentricFrame stFrame,
-            List<EphemerisVector> ecefVectors) {
+            List<EphemerisVector> ecefVectors,
+            int maskDeg) {
 
         if (ecefVectors == null || ecefVectors.size() < 2) return List.of();
 
-        // ✅ 시간 정렬 보장
         List<EphemerisVector> v = new ArrayList<>(ecefVectors);
         v.sort(Comparator.comparing(EphemerisVector::getTime));
 
@@ -94,39 +106,39 @@ public class ContactScheduleWoker {
 
             double dt = tCur.durationFrom(tPrev);
             if (dt <= 0) {
-                tPrev = tCur; rPrev = rCur; vPrev = vCur;
+                tPrev = tCur;
+                rPrev = rCur;
+                vPrev = vCur;
                 elPrev = topocentricService.getElevation(rPrev, stFrame, tPrev);
                 continue;
             }
 
             double elCur = topocentricService.getElevation(rCur, stFrame, tCur);
 
-            // AOS: el crosses 0 upward
-            if (curPass == null && elPrev <= 0.0 && elCur > 0.0) {
+            if (curPass == null && elPrev <= maskDeg && elCur > maskDeg) {
                 AbsoluteDate aos = HermiteEventUtils.refineRootTimeHermiteBisection(
                         tPrev, rPrev, vPrev,
-                        tCur,  rCur,  vCur,
+                        tCur, rCur, vCur,
                         elevFn,
-                        0.0,
+                        maskDeg,
                         1e-3,
                         60
                 );
 
                 curPass = new ContactSchedule(passNo, aos, null, 0.0, 0.0);
-                maxEl = 0.0;
+                maxEl = maskDeg;
             }
 
-            if (curPass != null) {
-                if (elCur > maxEl) maxEl = elCur;
+            if (curPass != null && elCur > maxEl) {
+                maxEl = elCur;
             }
 
-            // LOS: el crosses 0 downward
-            if (curPass != null && elPrev > 0.0 && elCur <= 0.0) {
+            if (curPass != null && elPrev > maskDeg && elCur <= maskDeg) {
                 AbsoluteDate los = HermiteEventUtils.refineRootTimeHermiteBisection(
                         tPrev, rPrev, vPrev,
-                        tCur,  rCur,  vCur,
+                        tCur, rCur, vCur,
                         elevFn,
-                        0.0,
+                        maskDeg,
                         1e-3,
                         60
                 );
@@ -148,8 +160,6 @@ public class ContactScheduleWoker {
             elPrev = elCur;
         }
 
-        // 끝까지 LOS가 없으면 “윈도우 밖”으로 취급하고 싶다면 null로 두는 방식도 가능
-        // (현재는 마지막 시각으로 마감)
         if (curPass != null) {
             AbsoluteDate end = timeConverter.localDateTimeUtcToAbsoluteDate(v.get(v.size() - 1).getTime());
             curPass.setLos(end);

@@ -4,7 +4,9 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 import org.junit.jupiter.api.Test;
+import org.orekit.frames.FramesFactory;
 import org.orekit.propagation.analytical.tle.TLE;
+import org.orekit.utils.IERSConventions;
 import org.sat_tool.SatToolApplication;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -29,20 +31,24 @@ class Propagetion {
 
     String path = "src/out";
 
-    LocalDateTime startTime = LocalDateTime.of(2025, 11, 3, 6, 9, 44);
-    LocalDateTime endTime = LocalDateTime.of(2025, 11, 4, 0, 0, 0);
+    LocalDateTime startTime = LocalDateTime.of(2025, 11, 4, 6, 9, 44);
+    LocalDateTime endTime = LocalDateTime.of(2025, 11, 5, 0, 0, 0);
 
     @Test
     void ECIOutFile() {
-        Path parnet = Paths.get(path+"/"+startTime.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))+"_orekit_eci.txt");
+        Path parnet = Paths.get(path+"/"+startTime.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))+"_orekit_eci.oem");
 
         var startAbsoluteDate = timeConverter.localDateTimeUtcToAbsoluteDate(startTime);
         var endAbsoluteDate = timeConverter.localDateTimeUtcToAbsoluteDate(endTime);
         TLE tle = new TLE(line1, line2);
         var propagator = propagatorService.sgp4Propagator(tle);
         var ephemerisECI = propagateService.computeEphemerisECI(propagator, startAbsoluteDate, endAbsoluteDate, 60.0);
-
-        propagateService.writeFile(ephemerisECI, parnet);
+        propagateService.writeOemFile(
+                ephemerisECI,
+                FramesFactory.getGCRF(),
+                parnet,
+                String.valueOf(tle.getSatelliteNumber()),
+                "SAT-" + tle.getSatelliteNumber());
     }
     
     @Test
@@ -57,6 +63,12 @@ class Propagetion {
         var ephemerisECEF = propagateService.computeEphemerisECEF(propagator, startAbsoluteDate, endAbsoluteDate, 60.0);
 
         propagateService.writeFile(ephemerisECEF, parnet);
+        propagateService.writeOemFile(
+                ephemerisECEF,
+                FramesFactory.getITRF(IERSConventions.IERS_2010, true),
+                parnet,
+                String.valueOf(tle.getSatelliteNumber()),
+                "SAT-" + tle.getSatelliteNumber());
     }
     
 }

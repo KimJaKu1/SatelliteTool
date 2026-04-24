@@ -57,7 +57,6 @@ fetch_URL()
       echo "failed!" 1>&2
       return 1
   fi
--
 }
 
 # fetch an MSAFE file

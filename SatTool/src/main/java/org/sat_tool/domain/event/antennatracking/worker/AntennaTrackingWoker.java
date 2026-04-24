@@ -30,6 +30,7 @@ public class AntennaTrackingWoker {
     // ✅ 방법 2: 저장 시점 스냅(3자리 출력 기준)
     // =========================
     private static final double PRINT_3DP_EPS_DEG = 5e-4; // 0.0005 deg
+    private static final String KEY_SEP = "|";
 
     private static float snapNegZero(float x) {
         return (Math.abs(x) < PRINT_3DP_EPS_DEG) ? 0.0f : x;
@@ -170,7 +171,7 @@ public class AntennaTrackingWoker {
 
                     // pass flush
                     int m = masks[mi];
-                    String key = satName + "_" + station.getStationName() + "_" + m;
+                    String key = satName + KEY_SEP + station.getStationName() + KEY_SEP + m;
                     out.computeIfAbsent(key, k -> new ArrayList<>()).add(buf[mi]);
                     buf[mi] = new ArrayList<>();
                 }
@@ -183,7 +184,7 @@ public class AntennaTrackingWoker {
         for (int mi = 0; mi < mCnt; mi++) {
             if (inPass[mi] && !buf[mi].isEmpty()) {
                 int m = masks[mi];
-                String key = satName + "_" + station.getStationName() + "_" + m;
+                String key = satName + KEY_SEP + station.getStationName() + KEY_SEP + m;
                 out.computeIfAbsent(key, k -> new ArrayList<>()).add(buf[mi]);
             }
         }

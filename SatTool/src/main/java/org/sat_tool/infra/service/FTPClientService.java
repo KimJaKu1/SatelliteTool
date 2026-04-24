@@ -100,13 +100,41 @@ public final class FTPClientService extends AbstractRemoteClient {
     @Override
     protected InputStream openRemoteInput(String remote)
             throws IOException, SftpException {
-        PipedInputStream in = new PipedInputStream();
-        new Thread(() -> {
-            try (OutputStream os = new PipedOutputStream(in)) {
-                ftp.retrieveFile(remote, os);
-            } catch (IOException e) { log.error("FTP retrieve", e); }
-        }).start();
-        return in;
+        InputStream in = ftp.retrieveFileStream(remote);
+        if (in == null) {
+            throw new IOException("FTP retrieve: " + ftp.getReplyString());
+        }
+
+        return new FilterInputStream(in) {
+            private boolean completed;
+
+            @Override
+            public void close() throws IOException {
+                IOException streamCloseFailure = null;
+
+                try {
+                    super.close();
+                } catch (IOException e) {
+                    streamCloseFailure = e;
+                }
+
+                if (!completed) {
+                    completed = true;
+                    if (!ftp.completePendingCommand()) {
+                        IOException retrieveFailure =
+                                new IOException("FTP retrieve: " + ftp.getReplyString());
+                        if (streamCloseFailure != null) {
+                            retrieveFailure.addSuppressed(streamCloseFailure);
+                        }
+                        throw retrieveFailure;
+                    }
+                }
+
+                if (streamCloseFailure != null) {
+                    throw streamCloseFailure;
+                }
+            }
+        };
     }
 
     @Override
@@ -119,7 +147,9 @@ public final class FTPClientService extends AbstractRemoteClient {
     @Override
     protected void deleteRemote(String remote)
             throws IOException, SftpException {
-        ftp.deleteFile(remote);
+        if (!ftp.deleteFile(remote)) {
+            throw new IOException("FTP delete: " + ftp.getReplyString());
+        }
     }
 
     @Override

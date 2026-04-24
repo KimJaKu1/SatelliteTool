@@ -2,25 +2,36 @@ package org.example.sattool;
 
 import org.junit.jupiter.api.Test;
 import org.orekit.propagation.analytical.tle.TLE;
+import org.orekit.propagation.analytical.tle.TLEPropagator;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.time.TimeScalesFactory;
 import org.sat_tool.SatToolApplication;
-import org.sat_tool.domain.event.service.CaptureService;
+import org.sat_tool.domain.common.converter.TimeConverter;
+import org.sat_tool.domain.coordinate.model.EphemerisVector;
+import org.sat_tool.domain.event.capture.service.CaptureService;
+import org.sat_tool.domain.propagation.service.PropagateService;
 import org.sat_tool.domain.visuallizse.model.FovParams;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.time.LocalDateTime;
+import java.util.List;
 
 
 @SpringBootTest(classes = SatToolApplication.class)
 public class footprintTest_20250915 {
 
     @Autowired private CaptureService captureService;
+    @Autowired private PropagateService propagateService;
+    @Autowired private TimeConverter timeConverter;
 
     // 2) 사각 FOV 정의 (카메라 스펙→반시야각)
     double f = 2.500;       // m
     double pitch = 3.45e-6; // m
     int Wpx = 11664, Hpx = 8750;
+
+    LocalDateTime startTime = LocalDateTime.of(2025, 11, 4, 0, 0, 0);
+    LocalDateTime endTime = LocalDateTime.of(2025, 11, 28, 0, 0, 0);
 
     String line1;
 
@@ -36,13 +47,13 @@ public class footprintTest_20250915 {
 
         AbsoluteDate t0 = new AbsoluteDate(2025,11,4,0,0,0, TimeScalesFactory.getUTC());
 //        AbsoluteDate t1 = t0.shiftedBy(0.0); // 순간 촬영만
-        AbsoluteDate t1 = new AbsoluteDate(2025,11,11,0,0,0, TimeScalesFactory.getUTC());
+        AbsoluteDate t1 = new AbsoluteDate(2025,11,28,0,0,0, TimeScalesFactory.getUTC());
 
         FovParams fov = new FovParams();
         fov.setFocalLength_m(2.500);   // focal length [m]
-        fov.setFocalLength_m(3.45e-6); // pixel pitch [m]
+        fov.setPixelPitch_m(3.45e-6);  // pixel pitch [m]
         fov.setWpx(11664);             // W px
-        fov.setWpx(8750);              // H px
+        fov.setHpx(8750);              // H px
 
         double rollLimitDeg = 20.0;
 
@@ -50,6 +61,21 @@ public class footprintTest_20250915 {
                 line1, line2,
                 36.350389, 127.386260, 0,
                 t0,t1,
+                1,
+                fov,
+                rollLimitDeg
+        );
+
+        TLEPropagator propagator = TLEPropagator.selectExtrapolator(tle);
+
+        List<EphemerisVector> ephemerisVectors = propagateService.computeEphemerisECEF(propagator,timeConverter.localDateTimeUtcToAbsoluteDate(startTime),
+                timeConverter.localDateTimeUtcToAbsoluteDate(endTime),
+                1);
+
+        var temp2 = captureService.computeScheduleWithFootprintsFromEcef_NoPropagator(
+                ephemerisVectors,
+                36.350389, 127.386260, 0,
+                timeConverter.localDateTimeUtcToAbsoluteDate(startTime),timeConverter.localDateTimeUtcToAbsoluteDate(endTime),
                 1,
                 fov,
                 rollLimitDeg

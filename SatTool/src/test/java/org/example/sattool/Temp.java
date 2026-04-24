@@ -5,7 +5,7 @@ import org.orekit.propagation.analytical.tle.TLE;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.time.TimeScalesFactory;
 import org.sat_tool.SatToolApplication;
-import org.sat_tool.domain.event.service.CaptureService;
+import org.sat_tool.domain.event.capture.service.CaptureService;
 import org.sat_tool.domain.visuallizse.model.FovParams;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -39,9 +39,9 @@ class Temp {
 
         FovParams fov = new FovParams();
         fov.setFocalLength_m(2.500);   // focal length [m]
-        fov.setFocalLength_m(3.45e-6); // pixel pitch [m]
+        fov.setPixelPitch_m(3.45e-6);  // pixel pitch [m]
         fov.setWpx(11664);             // W px
-        fov.setWpx(8750);              // H px
+        fov.setHpx(8750);              // H px
 
         double rollLimitDeg = 20.0;
 

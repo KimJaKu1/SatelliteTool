@@ -47,9 +47,16 @@ public abstract class AbstractRemoteClient implements FileTransferService {
 
         for (String rf : remoteFiles) {
             Path target = dir.resolve(Path.of(rf).getFileName());
-            try (InputStream in  = openRemoteInput(rf);
+            try (InputStream in = openRemoteInput(rf);
                  OutputStream out = Files.newOutputStream(target)) {
                 in.transferTo(out);
+            } catch (IOException | RuntimeException e) {
+                try {
+                    Files.deleteIfExists(target);
+                } catch (IOException cleanupEx) {
+                    e.addSuppressed(cleanupEx);
+                }
+                throw e;
             }
             if (remove) deleteRemote(rf);
             log.info("[DOWNLOAD] {} → {}", rf, target);
@@ -95,11 +102,16 @@ public abstract class AbstractRemoteClient implements FileTransferService {
         Path tmp = Files.createTempDirectory("ftCopy");
         try {
             download(remoteFiles, tmp.toString(), false);               // ① 원격 → 로컬 tmp
-            List<File> locals = Files.list(tmp).map(Path::toFile).collect(Collectors.toList());
+            List<File> locals;
+            try (var listed = Files.list(tmp)) {
+                locals = listed.map(Path::toFile).collect(Collectors.toList());
+            }
             upload(locals, targetDir, true);                             // ② 로컬 tmp → 원격
         } finally {                                                      // ③ tmp 정리
-            Files.walk(tmp).sorted((a,b)->-a.compareTo(b))
-                    .forEach(p -> p.toFile().delete());
+            try (var walked = Files.walk(tmp)) {
+                walked.sorted((a, b) -> -a.compareTo(b))
+                        .forEach(p -> p.toFile().delete());
+            }
         }
     }
 }
