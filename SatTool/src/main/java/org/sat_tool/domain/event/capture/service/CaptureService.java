@@ -15,6 +15,7 @@ import org.orekit.utils.PVCoordinates;
 import org.sat_tool.domain.common.converter.TimeConverter;
 import org.sat_tool.domain.common.helper.HermiteEventUtils;
 import org.sat_tool.domain.coordinate.model.EphemerisVector;
+import org.sat_tool.domain.propagation.service.PropagatorService;
 import org.sat_tool.domain.visuallizse.model.FovParams;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Service;
@@ -95,6 +96,12 @@ public class CaptureService {
         CaptureState at(AbsoluteDate date);
     }
 
+    private final PropagatorService propagatorService;
+
+    public CaptureService(PropagatorService propagatorService) {
+        this.propagatorService = propagatorService;
+    }
+
     public List<ImagingOpportunity> computeScheduleWithFootprintsAndWriteFile(
             String tleLine1, String tleLine2,
             double targetLatDeg, double targetLonDeg, double targetH_m,
@@ -140,7 +147,7 @@ public class CaptureService {
         );
 
         TLE tle = new TLE(tleLine1, tleLine2);
-        TLEPropagator propagator = TLEPropagator.selectExtrapolator(tle);
+        TLEPropagator propagator = propagatorService.createPropagatorFromTle(tle);
 
         GeodeticPoint targetGeo = new GeodeticPoint(
                 Math.toRadians(targetLatDeg),

@@ -59,7 +59,8 @@ dependencies {
     annotationProcessor 'org.mapstruct:mapstruct-processor:1.5.5.Final'
 
     //궤도 관련
-    implementation 'org.orekit:orekit:13.0.3'
+    implementation 'org.orekit:orekit:13.1.5'
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
     implementation "org.hipparchus:hipparchus-core"
     implementation "org.hipparchus:hipparchus-geometry"
     implementation "org.hipparchus:hipparchus-ode"        // (Orekit 일부 기능에서 필요)

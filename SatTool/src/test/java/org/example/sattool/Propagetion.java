@@ -41,7 +41,7 @@ class Propagetion {
         var startAbsoluteDate = timeConverter.localDateTimeUtcToAbsoluteDate(startTime);
         var endAbsoluteDate = timeConverter.localDateTimeUtcToAbsoluteDate(endTime);
         TLE tle = new TLE(line1, line2);
-        var propagator = propagatorService.sgp4Propagator(tle);
+        var propagator = propagatorService.createPropagatorFromTle(tle);
         var ephemerisECI = propagateService.computeEphemerisECI(propagator, startAbsoluteDate, endAbsoluteDate, 60.0);
         propagateService.writeOemFile(
                 ephemerisECI,
@@ -59,7 +59,7 @@ class Propagetion {
         var startAbsoluteDate = timeConverter.localDateTimeUtcToAbsoluteDate(startTime);
         var endAbsoluteDate = timeConverter.localDateTimeUtcToAbsoluteDate(endTime);
         TLE tle = new TLE(line1, line2);
-        var propagator = propagatorService.sgp4Propagator(tle);
+        var propagator = propagatorService.createPropagatorFromTle(tle);
         var ephemerisECEF = propagateService.computeEphemerisECEF(propagator, startAbsoluteDate, endAbsoluteDate, 60.0);
 
         propagateService.writeFile(ephemerisECEF, parnet);

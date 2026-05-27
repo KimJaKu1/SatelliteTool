@@ -35,3 +35,9 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Native propagation binaries ###
+libs/*.dll
+libs/*.so
+libs/*.dylib
+libs/Sgp4Prop/
