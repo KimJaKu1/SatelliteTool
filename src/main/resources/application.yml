@@ -1,0 +1,14 @@
+orekit:
+  data-path: src/main/resources/orekit-data
+
+orekit-update:
+  bash: "C:/Program Files/Git/bin/bash.exe"
+
+spring:
+  application:
+    name : SatTool
+  autoconfigure:
+    exclude:
+  output:
+    ansi:
+      enabled: ALWAYS
