@@ -1,0 +1,84 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.0.0'
+    id 'io.spring.dependency-management' version '1.1.7'
+    id 'org.graalvm.buildtools.native' version '0.11.3'
+}
+
+group = 'org.example'
+version = '0.0.1-SNAPSHOT'
+description = 'SatTool'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+
+
+    // 유효성검사
+    implementation 'jakarta.validation:jakarta.validation-api:3.0.2'
+    implementation 'org.hibernate.validator:hibernate-validator:7.0.2.Final'
+
+    // 타임리프 추가
+    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+
+    implementation 'org.springframework.boot:spring-boot-starter'
+    implementation 'org.springframework.boot:spring-boot-devtools'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation "org.springframework.boot:spring-boot-autoconfigure"
+
+    compileOnly 'org.projectlombok:lombok'
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    annotationProcessor 'org.projectlombok:lombok'
+
+    // Commons Net (FTP)
+    implementation 'commons-net:commons-net:3.9.0'
+
+    //SFTP관련
+    implementation 'com.jcraft:jsch:0.1.55'
+
+    // MapStruct 추가
+    implementation 'org.mapstruct:mapstruct:1.5.5.Final'
+    annotationProcessor 'org.mapstruct:mapstruct-processor:1.5.5.Final'
+
+    //궤도 관련
+    implementation 'org.orekit:orekit:13.1.5'
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation "org.hipparchus:hipparchus-core"
+    implementation "org.hipparchus:hipparchus-geometry"
+    implementation "org.hipparchus:hipparchus-ode"        // (Orekit 일부 기능에서 필요)
+    implementation "org.hipparchus:hipparchus-fitting"    // (상황에 따라)
+
+    //java.time.LocalDateTime 같은 Java 8 날짜/시간 타입을 기본적으로 직렬화/역직렬화하지 못해서 발생하는 문제
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+
+
+    implementation 'io.projectreactor:reactor-core:3.5.0' // 최신 버전 확인 후 설정
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    jvmArgs '-Xms2g', '-Xmx12g', '-XX:+UseParallelGC'
+
+    testLogging {
+        showStandardStreams = true
+        events "passed", "failed", "skipped"
+    }
+}
