@@ -14,27 +14,27 @@ import lombok.Data;
 
 @Data
 public class Station {
-    public String stationName;
-    public float latitude;
-    public float longitude;
-    public float height;
-    public List<Integer> angles = new ArrayList<>();
+    private String stationName;
+    private double latitude;
+    private double longitude;
+    private double height;
+    private List<Integer> angles = new ArrayList<>();
 
-    public final OneAxisEllipsoid earth = new OneAxisEllipsoid(
+    private static final OneAxisEllipsoid EARTH = new OneAxisEllipsoid(
             Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
             Constants.WGS84_EARTH_FLATTENING,
             FramesFactory.getITRF(IERSConventions.IERS_2010, true));
 
     public TopocentricFrame getStationFrame() {
-        GeodeticPoint groundStation = new GeodeticPoint(Math.toRadians(this.latitude),Math.toRadians(this.longitude),this.height);
-        return new TopocentricFrame(earth, groundStation, this.stationName);
+        GeodeticPoint groundStation = new GeodeticPoint(Math.toRadians(this.latitude), Math.toRadians(this.longitude), this.height);
+        return new TopocentricFrame(EARTH, groundStation, this.stationName);
     }
 
     public Station(String stationName, double latitude, double longitude, double height, List<Integer> angles) {
         this.stationName = stationName;
-        this.latitude = (float)latitude;
-        this.longitude = (float)longitude;
-        this.height = (float)height;
+        this.latitude = latitude;
+        this.longitude = longitude;
+        this.height = height;
         this.angles = angles;
     }
 }

@@ -11,6 +11,7 @@ import org.orekit.propagation.analytical.tle.TLEPropagator;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -43,7 +44,8 @@ public final class Sgp4XpPropagatorFactory {
     public static TLEPropagator create(TLE tle) {
         Objects.requireNonNull(tle, "tle");
 
-        Throwable lastFailure = null;
+        // 후보별 실패 원인이 유실되지 않도록 마지막 원인 + suppressed로 모두 보존
+        List<Throwable> failures = new ArrayList<>();
         for (String className : PROPAGATOR_CLASSES) {
             try {
                 Class<?> propagatorClass = Class.forName(className);
@@ -53,16 +55,20 @@ public final class Sgp4XpPropagatorFactory {
                 }
                 return instantiate(propagatorClass, tle);
             } catch (ReflectiveOperationException | LinkageError | ClassCastException | IllegalArgumentException e) {
-                lastFailure = rootCause(e);
+                failures.add(rootCause(e));
             }
         }
 
-        throw new UnsupportedOperationException(
+        UnsupportedOperationException failure = new UnsupportedOperationException(
                 "SGP4-XP requires aholinch/orekit-sgp4-xp on the runtime classpath and USSF Sgp4Prop binaries "
                         + "available through PATH or LD_LIBRARY_PATH. No compatible USSFJnaTLEPropagator or "
                         + "USSFJniTLEPropagator class could be loaded.",
-                lastFailure
+                failures.isEmpty() ? null : failures.get(failures.size() - 1)
         );
+        for (int i = 0; i < failures.size() - 1; i++) {
+            failure.addSuppressed(failures.get(i));
+        }
+        throw failure;
     }
 
     private static TLEPropagator invokeStaticSelectExtrapolator(Class<?> propagatorClass, TLE tle)

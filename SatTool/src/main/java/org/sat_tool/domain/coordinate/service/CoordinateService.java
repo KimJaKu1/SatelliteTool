@@ -5,13 +5,12 @@ import org.orekit.bodies.GeodeticPoint;
 import org.orekit.bodies.OneAxisEllipsoid;
 import org.orekit.frames.Frame;
 import org.orekit.frames.FramesFactory;
-import org.orekit.frames.TopocentricFrame;
 import org.orekit.frames.Transform;
-import org.orekit.propagation.analytical.tle.TLEPropagator;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.utils.Constants;
 import org.orekit.utils.IERSConventions;
 import org.orekit.utils.PVCoordinates;
+import org.sat_tool.domain.coordinate.model.LLA;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Service;
 
@@ -35,6 +34,26 @@ public class CoordinateService {
         return transform.transformPVCoordinates(pvECI);
     }
 
+    public GeodeticPoint ecefToWgs84GeodeticPoint(AbsoluteDate date, Vector3D positionEcef) {
+        return earth.transform(positionEcef, itrf, date);
+    }
 
+    public LLA ecefToWgs84Lla(AbsoluteDate date, Vector3D positionEcef) {
+        return LLA.fromWgs84GeodeticPoint(ecefToWgs84GeodeticPoint(date, positionEcef));
+    }
 
+    public Vector3D wgs84LlaToEcef(LLA lla) {
+        return earth.transform(wgs84LlaToGeodeticPoint(lla));
+    }
+
+    public GeodeticPoint wgs84LlaToGeodeticPoint(LLA lla) {
+        if (lla == null) {
+            throw new IllegalArgumentException("LLA must not be null.");
+        }
+        return new GeodeticPoint(
+                Math.toRadians(lla.getLatitude()),
+                Math.toRadians(lla.getLongitude()),
+                lla.getAltitude()
+        );
+    }
 }
