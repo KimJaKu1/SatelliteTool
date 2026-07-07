@@ -1,14 +1,14 @@
+# data-path가 없거나 미존재 시 classpath(orekit-data / orekit-data.zip) 폴백 — OrekitInitService 참조
 orekit:
   data-path: src/main/resources/orekit-data
 
+# 머신별 경로는 환경변수 OREKIT_UPDATE_BASH로 재정의 (기본값: 코드의 /bin/bash)
 orekit-update:
-  bash: "C:/Program Files/Git/bin/bash.exe"
+  bash: "${OREKIT_UPDATE_BASH:C:/Program Files/Git/bin/bash.exe}"
 
 spring:
   application:
-    name : SatTool
-  autoconfigure:
-    exclude:
+    name: SatTool
   output:
     ansi:
       enabled: ALWAYS

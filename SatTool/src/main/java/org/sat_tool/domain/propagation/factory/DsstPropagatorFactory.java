@@ -5,7 +5,7 @@ import org.orekit.propagation.PropagationType;
 import org.orekit.propagation.SpacecraftState;
 import org.orekit.propagation.semianalytical.dsst.DSSTPropagator;
 import org.orekit.propagation.semianalytical.dsst.forces.DSSTForceModel;
-import org.sat_tool.domain.propagation.service.PropagatorService;
+import org.sat_tool.domain.propagation.model.DsstPropagationConfig;
 
 import java.util.Objects;
 
@@ -28,7 +28,7 @@ public final class DsstPropagatorFactory {
      * @param config DSST integrator and force models.
      * @return configured DSST propagator.
      */
-    public static DSSTPropagator create(Omm omm, PropagatorService.DsstPropagationConfig config) {
+    public static DSSTPropagator create(Omm omm, DsstPropagationConfig config) {
         Objects.requireNonNull(omm, "omm");
         Objects.requireNonNull(config, "config");
 

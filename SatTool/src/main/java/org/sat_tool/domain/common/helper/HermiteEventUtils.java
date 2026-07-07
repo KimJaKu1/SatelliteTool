@@ -2,6 +2,7 @@ package org.sat_tool.domain.common.helper;
 
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.orekit.time.AbsoluteDate;
+import org.orekit.utils.PVCoordinates;
 
 public final class HermiteEventUtils {
 
@@ -72,6 +73,47 @@ public final class HermiteEventUtils {
         return new PV(pos, vel);
     }
 
+    /**
+     * [t0,t1] 샘플 쌍 사이의 임의 시각 t를 Hermite 보간.
+     * dt<=0이면 (r0,v0) 그대로 반환.
+     */
+    public static PV pvInterpolateHermite(
+            AbsoluteDate t,
+            AbsoluteDate t0, Vector3D r0, Vector3D v0,
+            AbsoluteDate t1, Vector3D r1, Vector3D v1
+    ) {
+        double dt = t1.durationFrom(t0);
+        if (dt <= 0) return new PV(r0, v0);
+        double tau = t.durationFrom(t0) / dt;
+        return hermitePV(r0, v0, r1, v1, dt, tau);
+    }
+
+    /**
+     * 시간 정렬된 샘플 배열에서 임의 시각 t의 PV를 Hermite 보간으로 계산.
+     * - 프레임에 무관(입력 배열의 프레임 그대로 반환)
+     * - t가 샘플 범위 밖이면 첫/마지막 샘플을 그대로 반환(clamp)
+     */
+    public static PVCoordinates pvAtTimeNoProp(
+            AbsoluteDate t,
+            AbsoluteDate[] tAbs,
+            Vector3D[] r,
+            Vector3D[] v
+    ) {
+        int idx = lowerBound(tAbs, t);
+        if (idx <= 0) return new PVCoordinates(r[0], v[0]);
+        if (idx >= tAbs.length) {
+            int last = tAbs.length - 1;
+            return new PVCoordinates(r[last], v[last]);
+        }
+
+        PV pv = pvInterpolateHermite(
+                t,
+                tAbs[idx - 1], r[idx - 1], v[idx - 1],
+                tAbs[idx],     r[idx],     v[idx]
+        );
+        return new PVCoordinates(pv.pos(), pv.vel());
+    }
+
     // =========================================================
     // 2) Root finding: f(t) = target (bisection)
     // =========================================================
@@ -80,6 +122,11 @@ public final class HermiteEventUtils {
      * [t0, t1] 구간에서 f(t)=target의 해를 찾는다.
      * - endpoints가 target을 “끼고(부호 반대)” 있어야 bisection이 보장됨
      * - 아니면 fallback으로 선형 근사(타겟 비율) 후 반환
+     *
+     * 주의: endpoints가 근을 끼고 있지 않으면(bracketing 실패) 예외 없이
+     * 선형 근사로 추정한 시각을 조용히 반환한다. 즉, 반환된 시각이
+     * 실제 f(t)=target의 근을 보장하지 않으므로, 근의 존재가 중요한
+     * 호출자는 반환 시각에서 f 값을 재검증해야 한다.
      *
      * @param tolSeconds 결과 시간 오차 허용(초) (예: 1e-3 ~ 1e-2)
      * @param maxIter    반복 횟수 (예: 50~80)
@@ -136,6 +183,32 @@ public final class HermiteEventUtils {
         }
 
         return t0.shiftedBy(0.5 * (lo + hi) * dt);
+    }
+
+    // =========================================================
+    // 3) Binary search (시간 정렬 배열)
+    // =========================================================
+
+    /** arr[i] >= x 를 만족하는 최소 인덱스(lower bound) */
+    public static int lowerBound(AbsoluteDate[] arr, AbsoluteDate x) {
+        int lo = 0, hi = arr.length;
+        while (lo < hi) {
+            int mid = (lo + hi) >>> 1;
+            if (arr[mid].compareTo(x) < 0) lo = mid + 1;
+            else hi = mid;
+        }
+        return lo;
+    }
+
+    /** arr[i] > x 를 만족하는 최소 인덱스(upper bound) */
+    public static int upperBound(AbsoluteDate[] arr, AbsoluteDate x) {
+        int lo = 0, hi = arr.length;
+        while (lo < hi) {
+            int mid = (lo + hi) >>> 1;
+            if (arr[mid].compareTo(x) <= 0) lo = mid + 1;
+            else hi = mid;
+        }
+        return lo;
     }
 
     // =========================================================

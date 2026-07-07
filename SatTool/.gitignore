@@ -41,3 +41,6 @@ libs/*.dll
 libs/*.so
 libs/*.dylib
 libs/Sgp4Prop/
+
+### Machine-specific ###
+gradle.properties
